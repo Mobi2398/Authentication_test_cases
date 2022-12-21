@@ -1,12 +1,11 @@
 """
 Database Initialization and Models
 """
-from flask import flash
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey, func
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import relationship, Mapped, backref, load_only
+from sqlalchemy.orm import relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
@@ -15,8 +14,8 @@ db = SQLAlchemy()
 class GenericSQLAlchemyMethods:
 
     @classmethod
-    def find_by_id(cls, id):
-        return cls.query.filter(cls.id == id).first()
+    def find_by_id(cls, identity):
+        return cls.query.filter(cls.id == identity).first()
 
     @classmethod
     def all(cls):
@@ -100,8 +99,9 @@ class Profile(db.Model, GenericSQLAlchemyMethods):
     user_id = db.Column(db.Integer, ForeignKey('user.id'))
     first_name = db.Column(db.String(128))
     last_name = db.Column(db.String(128))
+    phone = db.Column(db.String(12))
 
-    def __init__(self, first_name, last_name):
+    def __init__(self, first_name, last_name, phone):
         self.first_name = first_name
         self.last_name = last_name
         self.phone = phone
@@ -111,7 +111,6 @@ class Group(db.Model, GenericSQLAlchemyMethods):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255))
     users = relationship("User", secondary="membership", backref='Group')
-    users = relationship("User", secondary="membership", back_populates="groups")
 
     def __init__(self, title):
         self.title = title

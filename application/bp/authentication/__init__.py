@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, login_required, current_user, logout_user
 
-from application.database import User, db, Profile, Group
+from application.database import User, Profile, Group
 from application.bp.authentication.forms import RegisterForm, LoginForm, ProfileForm, GroupForm, JoinGroupForm, \
     LeaveGroupForm
 
@@ -17,7 +17,6 @@ def users():
 @authentication.route('/dashboard')
 @login_required
 def dashboard():
-    user_records = User.all()
     return render_template('dashboard.html')
 
 
@@ -35,9 +34,9 @@ def registration():
         if user is None:
             user = User.create(form.email.data, form.password.data)
             user.save()
-            return redirect(url_for('homepage.homepage'))
+            return redirect(url_for('authentication.login'))
         else:
-            flash('This is not the correct text')
+            flash('Already Registered')
     return render_template('registration.html', form=form)
 
 
@@ -46,7 +45,7 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.find_user_by_email(form.email.data)
-        if user is not None:
+        if user is None:
             flash('User Not Found')
         elif user.check_password(form.password.data):
             flash('Welcome')
@@ -54,9 +53,9 @@ def login():
             user.save()
             login_user(user)
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('homepage.homepage'))
+            return redirect(next_page or url_for('authentication.dashboard'))
         else:
-            flash('You do not want to have it say this here')
+            flash('Password Incorrect')
     return render_template('login.html', form=form)
 
 
@@ -64,12 +63,22 @@ def login():
 @login_required
 def logout():
     current_user.authenticated = False
+    current_user.save()
+    logout_user()
+    flash("You are logged out")
+    return redirect(url_for('homepage.homepage'))
 
 
 @authentication.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
     form = ProfileForm(obj=current_user.profile)
+    if form.validate_on_submit():
+        user_profile = Profile(form.first_name.data, form.last_name.data, form.phone.data)
+        current_user.profile = user_profile
+        current_user.save()
+
+    return render_template('profile.html', form=form)
 
 
 @authentication.route('/groups/new', methods=['GET', 'POST'])
@@ -77,8 +86,8 @@ def profile():
 def group():
     form = GroupForm()
     if form.validate_on_submit():
-        group = Group(form.title.data)
-        group.save()
+        grouped = Group(form.title.data)
+        grouped.save()
         return redirect(url_for('authentication.groups', page='1'))
 
     return render_template('group_form.html', form=form)
@@ -95,19 +104,19 @@ def groups(page: int = 1):
 @authentication.route('/groups/<group_id>/delete', methods=['POST', 'GET'])
 @login_required
 def group_delete(group_id):
-    group = Group.find_by_id(group_id)
-    group.delete()
+    grouped = Group.find_by_id(group_id)
+    grouped.delete()
     return redirect(url_for('authentication.groups', page='1'))
 
 
 @authentication.route('/groups/<group_id>/edit', methods=['POST', 'GET'])
 @login_required
 def group_edit(group_id):
-    group = Group.find_by_id(group_id)
+    grouped = Group.find_by_id(group_id)
     form = GroupForm(obj=group)
     if form.validate_on_submit():
-        group.title = form.title.data
-        group.save()
+        grouped.title = form.title.data
+        grouped.save()
         return redirect(url_for('authentication.groups', page='1'))
 
     return render_template('group_form.html', form=form)
@@ -116,9 +125,9 @@ def group_edit(group_id):
 @authentication.route('/groups/<group_id>', methods=['POST', 'GET'])
 @login_required
 def group_view(group_id):
-    group = Group.find_by_id(group_id)
+    grouped = Group.find_by_id(group_id)
 
-    if group in current_user.groups:
+    if grouped in current_user.groups:
         group_form = LeaveGroupForm()
     else:
         group_form = JoinGroupForm()
